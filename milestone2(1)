@@ -1,0 +1,84 @@
+
+# tools.py
+
+from langchain_core.tools import Tool
+
+# Tool 1: Calculator
+def calculator(expression: str):
+    try:
+        return str(eval(expression))   # demo only
+    except Exception:
+        return "Invalid Math Expression"
+
+calculator_tool = Tool(
+    name="calculator",
+    func=calculator,
+    description="Use this tool to calculate expressions like '23+45'."
+)
+
+# Add more tools if needed
+tools = [calculator_tool]
+# agent.py
+
+import os
+from dotenv import load_dotenv
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import PromptTemplate
+from langchain.agents.react.agent import create_react_agent
+from langchain.agents import AgentExecutor
+from tools import tools
+
+load_dotenv()
+
+def create_agent():
+
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
+
+    # ReAct System Prompt
+    prompt = PromptTemplate.from_template("""
+        You are a helpful AI agent.
+        Use tools when needed.
+        Think step-by-step.
+
+        Question: {input}
+    """)
+
+    # Create ReAct Agent
+    agent = create_react_agent(
+        llm=llm,
+        tools=tools,
+        prompt=prompt
+    )
+
+    # Wrap agent in executor
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True
+    )
+
+    return agent_executor
+# main.py
+
+from agent import create_agent
+
+agent = create_agent()
+
+print("Gemini Tools-Enabled Agent is Ready!")
+print("Type 'exit' to quit.\n")
+
+while True:
+    query = input("You: ")
+
+    if query.lower() == "exit":
+        break
+
+    # NEW LANGCHAIN SYNTAX
+    response = agent.invoke({"input": query})
+
+    print("Agent:", response["output"])
