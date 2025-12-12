@@ -1,15 +1,8 @@
 import google.generativeai as genai
 import random
 
-# Configure Gemini API
 genai.configure(api_key="GEMINI_API_KEY")
 
-
-def calculator(expression: str):
-    try:
-        return {"result": str(eval(expression))}
-    except Exception as e:
-        return {"error": f"Invalid expression: {str(e)}"}
 
 def fake_weather(city: str):
     try:
@@ -24,22 +17,24 @@ def fake_weather(city: str):
         return {"city": city, "temperature": f"{temp}°C", "condition": cond}
     except Exception as e:
         return {"error": f"Weather API failed: {str(e)}"}
+
+def summarizer(text: str):
+    try:
+        if not text:
+            return {"error": "Text cannot be empty"}
+
+        # simple short summary
+        summary = " ".join(text.split()[:20]) + "..."
+        return {"summary": summary}
+
+    except Exception as e:
+        return {"error": f"Summarizer failed: {str(e)}"}
+
 model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
 
     tools=[{
         "function_declarations": [
-            {
-                "name": "calculator",
-                "description": "Solve mathematical expressions.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "expression": {"type": "string"}
-                    },
-                    "required": ["expression"]
-                }
-            },
             {
                 "name": "fake_weather",
                 "description": "Simulated weather API.",
@@ -50,31 +45,41 @@ model = genai.GenerativeModel(
                     },
                     "required": ["city"]
                 }
+            },
+            {
+                "name": "summarizer",
+                "description": "Summarize long text.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"}
+                    },
+                    "required": ["text"]
+                }
             }
         ]
     }],
 
     system_instruction="""
 Use tools when:
-- User asks math → use calculator
-- User asks weather → use fake_weather
+- User asks for weather → call fake_weather
+- User asks to summarize → call summarizer
 If tool fails, explain the error.
 If no tool needed, answer normally.
 """
 )
+
 def run_agent(user_input):
     response = model.generate_content(user_input)
-
     first = response.candidates[0].content.parts[0]
-
-    # If Gemini calls a tool
+    
     if hasattr(first, "function_call") and first.function_call:
         fc = first.function_call
 
-        if fc.name == "calculator":
-            result = calculator(**fc.args)
-        elif fc.name == "fake_weather":
+        if fc.name == "fake_weather":
             result = fake_weather(**fc.args)
+        elif fc.name == "summarizer":
+            result = summarizer(**fc.args)
 
         follow_up = model.generate_content(
             [
@@ -82,20 +87,17 @@ def run_agent(user_input):
                 {"function_response": {"name": fc.name, "response": result}}
             ]
         )
-
         return follow_up.text
 
-    # Otherwise normal answer
+    
     return response.text
-if __name__ == "__main__":
-    print("\n--- Calculator Test ---")
-    print(run_agent("What is 89 * 67?"))
 
+if __name__ == "__main__":
     print("\n--- Weather Test ---")
-    print(run_agent("What is the weather in Chennai?"))
+    print(run_agent("What is the weather in Hyderabad?"))
+
+    print("\n--- Summarizer Test ---")
+    print(run_agent("Summarize this: Artificial intelligence is transforming industries..."))
 
     print("\n--- Normal Question ---")
-    print(run_agent("Who discovered gravity?"))
-
-    print("\n--- Error Case Test ---")
-    print(run_agent("Weather in X?"))
+    print(run_agent("Who invented electricity?"))
