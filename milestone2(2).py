@@ -31,7 +31,7 @@ def summarizer(text: str):
         return {"error": f"Summarizer failed: {str(e)}"}
 
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
+    model_name="gemini-2.5-flash",
 
     tools=[{
         "function_declarations": [
@@ -102,3 +102,4 @@ if __name__ == "__main__":
 
     print("\n--- Normal Question ---")
     print(run_agent("Who invented electricity?"))
+
